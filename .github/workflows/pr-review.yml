@@ -1,0 +1,52 @@
+name: PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            Review this pull request rigorously. Structure your response exactly as follows:
+
+            ## Verdict
+            APPROVE | REQUEST_CHANGES | COMMENT
+            (one line, no other text on this line)
+
+            ## Summary
+            1-3 bullets on what this PR does and why.
+
+            ## Findings
+            For each issue: `file:line — severity — description`
+            Severity: 🔴 blocking | 🟡 nit | 🔵 suggestion
+
+            If no issues found: write "No findings."
+
+            ## What was checked
+            - Correctness: logic errors, off-by-one, null/undefined/empty handling
+            - Security: injection vectors, hardcoded secrets, improper auth/authz, OWASP Top 10
+            - Test evidence: are acceptance criteria covered by tests? Is raw test output attached?
+            - Style: follows CLAUDE.md conventions?
+            - Scope: changes outside the spec, unasked-for refactors or abstractions
+
+            Rules:
+            - Lead with the verdict, always.
+            - Every finding must be anchored to a file:line citation.
+            - Do not guess — if you're not sure, say so and mark it 🔵.
+            - Do not approve if test evidence is missing for new behaviour.
+            - Do not approve if any 🔴 blocking finding exists.
+          claude_args: "--max-turns 5 --model claude-sonnet-5"
